@@ -2,13 +2,13 @@ package com.shoecenter.ui;
 
 import com.shoecenter.config.config;
 import com.shoecenter.model.Producto;
-import com.shoecenter.repository.ClientesDAO;
+import com.shoecenter.model.Usuario;
+import com.shoecenter.service.ProductoService;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.ActionListener;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -17,17 +17,22 @@ public class DetalleProductoForm extends JDialog {
     private final Producto producto;
     private final boolean esAdmin;
     private DefaultTableModel modeloCarrito;
+    private final ProductoService productoService = new ProductoService();
+
 
     private JLabel lblImagen, lblStock, lblPrecio, lblCantidad, lblProducto, lblTalla;
     private JTextField txtStock, txtPrecio, txtCantidad;
-    private JButton btnCarrito, btnTalla, btnImage;
+    private JButton btnCarrito, btnTalla, btnImage,btnModificarStock,btnModificarPrecio;
     private Map<Integer, JRadioButton> radioButtonsTallas = new HashMap<>();
     private ButtonGroup groupTalla;
+    private final Usuario usuarioSesion;
 
-    public DetalleProductoForm(Frame owner, Producto producto, boolean esAdmin, DefaultTableModel modelo) {
+
+    public DetalleProductoForm(Frame owner, Producto producto, Usuario usuario, DefaultTableModel modelo) {
         super(owner, "Detalle del producto", true);
         this.producto = producto;
-        this.esAdmin = esAdmin;
+        this.usuarioSesion = usuario;
+        this.esAdmin = usuario.getRol().equalsIgnoreCase("ADMIN");
         this.modeloCarrito = modelo;
 
         initializeComponents();
@@ -47,7 +52,14 @@ public class DetalleProductoForm extends JDialog {
     }
 
     private void initializeComponents() {
-        // Textos y Fuentes
+        instanciarEtiquetas();
+        instanciarCamposTexto();
+        instanciarBotones();
+        construirSelectorTallas();
+        cargarImagenProducto();
+    }
+
+    private void instanciarEtiquetas(){
         lblProducto = new JLabel(producto.getMarca().toUpperCase());
         lblProducto.setFont(new Font("Tahoma", Font.BOLD, 30));
 
@@ -60,8 +72,9 @@ public class DetalleProductoForm extends JDialog {
         lblPrecio.setFont(new Font("Tahoma", Font.BOLD, 15));
         lblCantidad = new JLabel("Cantidad:");
         lblCantidad.setFont(new Font("Tahoma", Font.BOLD, 15));
+    }
 
-        // Campos (Iniciamos con la talla por defecto o la primera disponible)
+    private void instanciarCamposTexto(){
         txtStock = new JTextField(String.valueOf(producto.getStockDeTalla(40)), 10);
         txtPrecio = new JTextField(String.valueOf(producto.getPrecio()), 10);
         txtCantidad = new JTextField("1", 5);
@@ -70,27 +83,53 @@ public class DetalleProductoForm extends JDialog {
             txtStock.setEditable(false);
             txtPrecio.setEditable(false);
         }
+    }
 
+    private void instanciarBotones() {
         btnImage = new JButton("Modificar Imagen");
         btnCarrito = new JButton("Adicionar al Carrito");
         btnTalla = new JButton("Gestionar Tallas");
+        btnModificarStock = new JButton("Modificar Stock");
+        btnModificarPrecio = new JButton("Modificar Precio");
+    }
 
-        // RadioButtons
-
+    private void construirSelectorTallas() {
         groupTalla = new ButtonGroup();
         radioButtonsTallas.clear();
 
-        // Supongamos que producto.getTallasDisponibles() devuelve una lista [40, 42, 44]
+        boolean primeraTalla = true;
         for (Integer talla : producto.getTallasDisponibles()) {
             JRadioButton rdbtn = new JRadioButton(String.valueOf(talla));
-
-            // Seleccionar el primero por defecto
-            if (radioButtonsTallas.isEmpty()) rdbtn.setSelected(true);
+            rdbtn.setBackground(Color.WHITE);
+            rdbtn.addActionListener(e -> actualizarStockVista());
 
             groupTalla.add(rdbtn);
             radioButtonsTallas.put(talla, rdbtn);
-        }
 
+            if (primeraTalla) {
+                rdbtn.setSelected(true);
+                primeraTalla = false;
+            }
+        }
+        actualizarStockVista();
+    }
+
+    private void actualizarStockVista() {
+        Integer talla = obtenerTallaSeleccionada();
+        if (talla != null) {
+            int stockDisponible = producto.getStockDeTalla(talla);
+            txtStock.setText(String.valueOf(stockDisponible));
+        }
+    }
+
+    private Integer obtenerTallaSeleccionada() {
+        for (Map.Entry<Integer, JRadioButton> entry : radioButtonsTallas.entrySet()) {
+            if (entry.getValue().isSelected()) return entry.getKey();
+        }
+        return null;
+    }
+
+    private void cargarImagenProducto() {
         try {
             ImageIcon icon = new ImageIcon(config.PATH + producto.getFoto());
             Image img = icon.getImage().getScaledInstance(275, 150, Image.SCALE_SMOOTH);
@@ -98,38 +137,6 @@ public class DetalleProductoForm extends JDialog {
         } catch (Exception e) {
             lblImagen = new JLabel("Imagen no encontrada");
         }
-    }
-
-    private void setUpEvents() {
-        // Evento para actualizar stock según talla seleccionada
-        ActionListener tallaListener = e -> {
-            int talla = Integer.parseInt(((JRadioButton)e.getSource()).getText());
-            txtStock.setText(String.valueOf(producto.getStockDeTalla(talla)));
-        };
-
-        // Aplicar a todos los botones generados
-        radioButtonsTallas.values().forEach(btn -> btn.addActionListener(tallaListener));
-
-        btnCarrito.addActionListener(e -> {
-            try {
-                int cant = Integer.parseInt(txtCantidad.getText());
-                double pu = producto.getPrecio();
-                double importe = cant * pu;
-
-                modeloCarrito.addRow(new Object[]{
-                        cant,
-                        producto.getMarca(),
-                        pu,
-                        importe
-                });
-
-                new PuntodeVentaForm(new ClientesDAO(), modeloCarrito).setVisible(true);
-                this.dispose();
-
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Por favor, ingrese una cantidad válida.");
-            }
-        });
     }
 
     private void configureLayout() {
@@ -140,11 +147,9 @@ public class DetalleProductoForm extends JDialog {
         gbc.fill = GridBagConstraints.BOTH;
         gbc.weighty = 1.0;
 
-        // Izquierdo (Imagen y Datos Técnicos)
         gbc.gridx = 0; gbc.weightx = 0.6;
         panelPrincipal.add(crearPanelIzquierdo(), gbc);
 
-        // Derecho (Marca, Tallas, Compra)
         gbc.gridx = 1; gbc.weightx = 0.4;
         panelPrincipal.add(crearPanelDerecho(), gbc);
         add(panelPrincipal, BorderLayout.CENTER);
@@ -214,9 +219,9 @@ public class DetalleProductoForm extends JDialog {
 
         if (esAdmin) {
             gbl.gridy = 2;
-            panelLeft.add(new JButton("Modificar Stock"), gbl);
+            panelLeft.add(btnModificarStock, gbl);
             gbr.gridy = 2;
-            panelRight.add(new JButton("Modificar Precio"), gbr);
+            panelRight.add(btnModificarPrecio, gbr);
         }
 
         gbc.gridy = 1;
@@ -280,5 +285,81 @@ public class DetalleProductoForm extends JDialog {
         gbc.gridwidth = 2;
         panelPrincipal.add(btnCarrito,gbc);
         return panelPrincipal;
+    }
+
+    private void setUpEvents() {
+        btnCarrito.addActionListener(e -> procesarNavegacionVenta());
+
+        if (esAdmin) {
+            btnModificarPrecio.addActionListener(e -> ejecutarCambioPrecio());
+            btnModificarStock.addActionListener(e -> ejecutarCambioStock());
+            btnTalla.addActionListener(e -> ejecutarGestionTallas());
+            btnImage.addActionListener(e -> ejecutarCambioImagen());
+        }
+    }
+
+    private void ejecutarCambioPrecio() {
+        String nuevoPrecio = JOptionPane.showInputDialog(this, "Nuevo precio para " + producto.getMarca(), txtPrecio.getText());
+        if (productoService.actualizarPrecio(producto.getId(), nuevoPrecio)) {
+            txtPrecio.setText(nuevoPrecio);
+            producto.setPrecio(Double.parseDouble(nuevoPrecio));
+            JOptionPane.showMessageDialog(this, "Precio actualizado correctamente.");
+        } else if (nuevoPrecio != null) {
+            JOptionPane.showMessageDialog(this, "Error: Ingrese un precio válido mayor a 0.");
+        }
+    }
+
+    private void ejecutarCambioStock() {
+        Integer talla = obtenerTallaSeleccionada();
+        if (talla == null) return;
+
+        String nuevoStock = JOptionPane.showInputDialog(this, "Nuevo stock para talla " + talla, txtStock.getText());
+        if (productoService.actualizarStock(producto.getId(), talla, nuevoStock)) {
+            txtStock.setText(nuevoStock);
+            producto.setStockParaTalla(talla, Integer.parseInt(nuevoStock));
+            JOptionPane.showMessageDialog(this, "Stock actualizado con éxito.");
+        } else if (nuevoStock != null) {
+            JOptionPane.showMessageDialog(this, "Error: Ingrese un valor numérico válido.");
+        }
+    }
+
+    private void ejecutarGestionTallas() {
+        String nuevaTallaStr = JOptionPane.showInputDialog(this, "Ingrese la nueva talla a adicionar:");
+        if (nuevaTallaStr != null && !nuevaTallaStr.isEmpty()) {
+            // Lógica para enviar al Service y actualizar el selector de tallas
+            JOptionPane.showMessageDialog(this, "Función de tallas en desarrollo.");
+        }
+    }
+
+    private void ejecutarCambioImagen() {
+        // Aquí podrías usar otro JFileChooser para seleccionar la imagen en tu Arch Linux
+        JOptionPane.showMessageDialog(this, "Seleccione la nueva imagen del producto.");
+    }
+
+    private void procesarNavegacionVenta() {
+        Integer talla = obtenerTallaSeleccionada();
+        String cantStr = txtCantidad.getText();
+
+        if (productoService.esSeleccionValida(talla, cantStr, producto)) {
+            try {
+                int cant = Integer.parseInt(cantStr);
+                String desc = producto.getMarca() + " (T:" + talla + ")";
+                int stockDisponible = producto.getStockDeTalla(talla);
+
+                // Invocamos la lógica centralizada en el Service
+                productoService.gestionarAdicionCarrito(modeloCarrito, desc, cant, producto.getPrecio(), stockDisponible);
+
+                // Navegación mediante StarterForm
+                StarterForm padre = (StarterForm) getOwner();
+                PuntodeVentaForm ventanaVenta = padre.getPuntodeVenta();
+
+                ventanaVenta.actualizarTotal();
+                ventanaVenta.setVisible(true);
+                this.dispose();
+
+            } catch (IllegalArgumentException ex) {
+                JOptionPane.showMessageDialog(this, ex.getMessage(), "Validación de Inventario", JOptionPane.WARNING_MESSAGE);
+            }
+        }
     }
 }

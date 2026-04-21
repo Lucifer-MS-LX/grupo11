@@ -1,14 +1,17 @@
 package com.shoecenter.ui;
 
+import com.shoecenter.service.TicketService;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.IOException;
+import javax.swing.JOptionPane;
 
 public class PaymentForm extends JFrame {
 
-    // Componentes de Selección (Izquierda)
     private JRadioButton rbEnTienda, rbDelivery, rbEfectivo, rbYape;
     private ButtonGroup grupoEnvio, grupoPago;
     private JPanel panelDinamicoEnvio, panelDinamicoPago;
@@ -16,14 +19,15 @@ public class PaymentForm extends JFrame {
     private JTextField txtDireccion;
     private JLabel lblDinamicoEnvio, lblImagenQR, lblTotal;
 
-    // Componentes de Vista Previa (Derecha)
     private JTable tblPreview;
     private DefaultTableModel modeloTabla;
     private JScrollPane scrollTabla;
 
-    // Datos que vienen del Punto de Venta
     private DefaultTableModel modeloCarrito;
     private String totalVenta;
+
+    private final TicketService ticketService = new TicketService();
+    private JButton btnConfirmar;
 
     public PaymentForm(DefaultTableModel modelo, String totalVenta) {
         this.modeloCarrito = modelo;
@@ -83,6 +87,13 @@ public class PaymentForm extends JFrame {
         lblTotal = new JLabel("TOTAL A PAGAR: " + totalVenta, SwingConstants.RIGHT);
         lblTotal.setFont(new Font("Tahoma", Font.BOLD, 16));
         lblTotal.setForeground(new Color(0, 102, 51));
+
+        btnConfirmar = new JButton("Confirmar Pago y Generar Ticket");
+        btnConfirmar.setFont(new Font("Tahoma", Font.BOLD, 14));
+        btnConfirmar.setBackground(new Color(40, 167, 69)); // Un verde elegante
+        btnConfirmar.setForeground(Color.WHITE);
+        btnConfirmar.setFocusPainted(false);
+        btnConfirmar.setCursor(new Cursor(Cursor.HAND_CURSOR));
     }
 
     private void mostrarResumen() {
@@ -102,7 +113,6 @@ public class PaymentForm extends JFrame {
         JPanel contentPrincipal = new JPanel(new BorderLayout(15, 0));
         contentPrincipal.setBorder(new EmptyBorder(15, 20, 15, 20));
 
-        // Formulario (Izquierda)
         JPanel panelIzquierdo = new JPanel();
         panelIzquierdo.setLayout(new BoxLayout(panelIzquierdo, BoxLayout.Y_AXIS));
         panelIzquierdo.setPreferredSize(new Dimension(400, 450));
@@ -124,13 +134,19 @@ public class PaymentForm extends JFrame {
         panelIzquierdo.add(pPago);
         panelIzquierdo.add(panelDinamicoPago);
 
-        // Resumen (Derecha)
         JPanel panelDerecho = new JPanel(new BorderLayout(0, 10));
         panelDerecho.setBorder(BorderFactory.createTitledBorder(null, "Resumen del Pedido",
                 TitledBorder.DEFAULT_JUSTIFICATION, TitledBorder.DEFAULT_POSITION, new Font("Tahoma", Font.BOLD, 13)));
 
         panelDerecho.add(scrollTabla, BorderLayout.CENTER);
-        panelDerecho.add(lblTotal, BorderLayout.SOUTH);
+
+        JPanel panelAuxiliar = new JPanel(new GridLayout(1, 2, 5, 5));
+        panelAuxiliar.setBorder(new EmptyBorder(10, 0, 0, 0)); // Espacio superior
+
+        panelAuxiliar.add(lblTotal);      // Fila 1: El monto total
+        panelAuxiliar.add(btnConfirmar);
+
+        panelDerecho.add(panelAuxiliar, BorderLayout.SOUTH);
 
         contentPrincipal.add(panelIzquierdo, BorderLayout.WEST);
         contentPrincipal.add(panelDerecho, BorderLayout.CENTER);
@@ -151,6 +167,37 @@ public class PaymentForm extends JFrame {
         rbDelivery.addActionListener(e -> actualizarEnvio());
         rbEfectivo.addActionListener(e -> actualizarPago());
         rbYape.addActionListener(e -> actualizarPago());
+
+        btnConfirmar.addActionListener(e -> procesarConfirmacionPago());
+    }
+
+    private void procesarConfirmacionPago() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Seleccione dónde guardar el ticket");
+
+        // Sugerimos un nombre por defecto basado en el tiempo
+        String nombreSugerido = "ticket_" + System.currentTimeMillis() + ".txt";
+        chooser.setSelectedFile(new java.io.File(nombreSugerido));
+
+        int seleccion = chooser.showSaveDialog(this);
+
+        if (seleccion == 0){
+            try {
+                String rutaElegida = chooser.getSelectedFile().getAbsolutePath();
+                String metodo = rbYape.isSelected() ? "YAPE" : "EFECTIVO";
+
+                // Pasamos la ruta elegida al servicio
+                ticketService.generarTicket(modeloCarrito, totalVenta, metodo, rutaElegida);
+
+                JOptionPane.showMessageDialog(this, "Ticket guardado en: " + rutaElegida);
+
+                this.dispose();
+                // Aquí podrías llamar al reset del formulario principal si es necesario
+
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(this, "Error al guardar: " + ex.getMessage());
+            }
+        }
     }
 
     private void actualizarEnvio() {
@@ -167,7 +214,40 @@ public class PaymentForm extends JFrame {
 
     private void actualizarPago() {
         panelDinamicoPago.removeAll();
-        if (rbYape.isSelected()) panelDinamicoPago.add(lblImagenQR, BorderLayout.CENTER);
-        panelDinamicoPago.revalidate(); panelDinamicoPago.repaint();
+
+        if (rbYape.isSelected()) {
+            panelDinamicoPago.setLayout(new BorderLayout(5, 5));
+
+            // QuickChart es el estándar actual para QRs sencillos por URL
+            String contenido = "YAPE_PAGO_SHOE_CENTER_S/" + totalVenta;
+            String urlQR = "https://quickchart.io/qr?text=" + contenido + "&size=250";
+
+            try {
+                // Imprimimos para que verifiques en tu terminal de Arch
+                System.out.println("Generando QR dinámico en: " + urlQR);
+
+                ImageIcon qrIcon = new ImageIcon(new java.net.URL(urlQR));
+                lblImagenQR = new JLabel(qrIcon);
+                lblImagenQR.setHorizontalAlignment(JLabel.CENTER);
+
+                JLabel lblInstruccion = new JLabel("Escanea para pagar S/ " + totalVenta);
+                lblInstruccion.setFont(new Font("Tahoma", Font.BOLD, 14));
+                lblInstruccion.setForeground(new Color(113, 34, 131)); // Púrpura Yape
+                lblInstruccion.setHorizontalAlignment(JLabel.CENTER);
+
+                panelDinamicoPago.add(lblInstruccion, BorderLayout.NORTH);
+                panelDinamicoPago.add(lblImagenQR, BorderLayout.CENTER);
+
+            } catch (Exception e) {
+                System.err.println("Error de red: " + e.getMessage());
+                panelDinamicoPago.add(new JLabel("Error: Verifique su conexión a internet"), BorderLayout.CENTER);
+            }
+        } else if (rbEfectivo.isSelected()) {
+            panelDinamicoPago.setLayout(new FlowLayout(FlowLayout.CENTER));
+            panelDinamicoPago.add(new JLabel("Pague S/ " + totalVenta + " directamente en caja."));
+        }
+
+        panelDinamicoPago.revalidate();
+        panelDinamicoPago.repaint();
     }
 }

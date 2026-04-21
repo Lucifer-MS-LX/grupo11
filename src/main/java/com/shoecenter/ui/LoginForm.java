@@ -13,6 +13,7 @@ public class LoginForm extends JFrame {
     private JTextField txtUser;
     private JPasswordField txtPass;
     private JButton btnLogin;
+
     private final UsuarioDAO usuarioDAO = new UsuarioDAO();
 
     public LoginForm() {
@@ -107,7 +108,7 @@ public class LoginForm extends JFrame {
             String user = txtUser.getText();
             String pass = new String(txtPass.getPassword());
 
-            Usuario u = usuarioDAO.validarAcceso(user, pass);
+            Usuario u = UsuarioDAO.validarAcceso(user, pass);
 
             if (u != null) {
                 new StarterForm(u).setVisible(true);
