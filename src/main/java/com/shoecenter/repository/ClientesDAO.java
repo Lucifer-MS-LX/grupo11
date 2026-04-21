@@ -1,30 +1,74 @@
 package com.shoecenter.repository;
 
 import com.shoecenter.model.Cliente;
-import java.util.HashMap;
-import java.util.Collection;
+import com.shoecenter.config.DatabaseConnection; // Importa tu clase de conexión
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ClientesDAO {
-    // El DAO centraliza los datos
-    private HashMap<String, Cliente> clientes;
-
-    public ClientesDAO() {
-        clientes = new HashMap<>();
-        // Datos de prueba iniciales
-        guardarCliente(new Cliente("Cliente 1", "Av. Circunvalación", "99999999", "12345678"));
-        guardarCliente(new Cliente("Cliente 2", "Av. Arenales", "99999998", "23456789"));
-        guardarCliente(new Cliente("Cliente 3", "Av. La Molina", "99999997", "34567890"));
-    }
 
     public void guardarCliente(Cliente cliente) {
-        clientes.put(cliente.getNombre(), cliente);
+        String sql = "INSERT INTO clientes (nombre, direccion, telefono, documento) VALUES (?, ?, ?, ?) " +
+                "ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), direccion = VALUES(direccion), telefono = VALUES(telefono)";
+
+        try (Connection conn = DatabaseConnection.getConexion();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            if (conn == null) return; // Validación de seguridad
+
+            ps.setString(1, cliente.getNombre());
+            ps.setString(2, cliente.getDireccion());
+            ps.setString(3, cliente.getTelefono());
+            ps.setString(4, cliente.getDocumento());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
-    public Cliente obtenerCliente(String nombre) {
-        return clientes.get(nombre);
+    public Cliente obtenerClientePorDocumento(String documento) {
+        String sql = "SELECT * FROM clientes WHERE documento = ?";
+        try (Connection conn = DatabaseConnection.getConexion();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            if (conn == null) return null;
+
+            ps.setString(1, documento);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new Cliente(
+                            rs.getString("nombre"),
+                            rs.getString("direccion"),
+                            rs.getString("telefono"),
+                            rs.getString("documento")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
-    public Collection<String> obtenerNombresClientes() {
-        return clientes.keySet();
+    public List<Cliente> listarTodos() {
+        List<Cliente> lista = new ArrayList<>();
+        String sql = "SELECT * FROM clientes ORDER BY nombre ASC";
+        try (Connection conn = DatabaseConnection.getConexion();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+
+            if (conn == null) return lista;
+
+            while (rs.next()) {
+                lista.add(new Cliente(
+                        rs.getString("nombre"), rs.getString("direccion"),
+                        rs.getString("telefono"), rs.getString("documento")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return lista;
     }
 }

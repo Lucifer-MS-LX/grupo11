@@ -1,9 +1,9 @@
 package com.shoecenter.ui;
-
 import com.shoecenter.config.config;
 import com.shoecenter.model.Producto;
 import com.shoecenter.model.Usuario;
 import com.shoecenter.repository.ProductoDAO;
+import com.shoecenter.service.NavigationService;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -13,52 +13,45 @@ import java.awt.*;
 
 public class StarterForm extends JFrame {
 
-    private JMenuBar menuBar;
-    private JMenu menuAccion;
     private JRadioButton rbman, rbwoman;
     private ButtonGroup groupGenero;
     private JPanel panelFotos;
 
     private DefaultTableModel modeloCarrito;
     private final ProductoDAO productoDAO = new ProductoDAO();
-    private Usuario usuarioSesion;
+    private final Usuario usuarioSesion;
+    private final boolean isAdmin;
+    private final NavigationService navigationService;
 
     public StarterForm(Usuario usuario) {
         this.usuarioSesion = usuario;
+        this.navigationService = new NavigationService(this);
+        this.isAdmin = usuario.getRol().equalsIgnoreCase("ADMIN");
         initUI();
     }
 
     private void initUI() {
         configureWindow();
+        if (isAdmin) {
+            configureMenuBar();
+        }
         initializeComponents();
         setUpEvents();
         configureLayout();
-        generarBotonesDinamicos(config.TEXT_RBMAN);
+        generarBotonesDinamicos("Hombre");
     }
 
     private void configureWindow() {
-        setTitle(config.TEXT_TITLE + " - " + usuarioSesion.getUsername());
+        setTitle("SHOECENTER" + " - " + usuarioSesion.getUsername());
         setSize(1000, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
     }
 
     private void initializeComponents() {
-        menuBar = new JMenuBar();
-        menuAccion = new JMenu("Acciones");
 
-        JMenuItem itemAdd = new JMenuItem("Nuevo Producto");
-        menuAccion.add(itemAdd);
-
-        setJMenuBar(menuBar);
-        menuBar.add(menuAccion);
-
-        if (!usuarioSesion.getRol().equalsIgnoreCase("ADMIN")) {
-            menuAccion.setVisible(false);
-        }
-
-        rbman = new JRadioButton(config.TEXT_RBMAN, true);
-        rbwoman = new JRadioButton(config.TEXT_RBWOMAN, false);
+        rbman = new JRadioButton("Hombre", true);
+        rbwoman = new JRadioButton("Mujer", false);
         groupGenero = new ButtonGroup();
         groupGenero.add(rbman); groupGenero.add(rbwoman);
 
@@ -70,17 +63,8 @@ public class StarterForm extends JFrame {
     }
 
     private void setUpEvents() {
-        Component[] menuItems = menuAccion.getMenuComponents();
-        for (Component item : menuItems) {
-            if (item instanceof JMenuItem && ((JMenuItem) item).getText().equals("Nuevo Producto")) {
-                ((JMenuItem) item).addActionListener(e -> {
-                    new AddProducto().setVisible(true);
-                });
-            }
-        }
-
-        rbman.addActionListener(e -> generarBotonesDinamicos(config.TEXT_RBMAN));
-        rbwoman.addActionListener(e -> generarBotonesDinamicos(config.TEXT_RBWOMAN));
+        rbman.addActionListener(e -> generarBotonesDinamicos("Hombre"));
+        rbwoman.addActionListener(e -> generarBotonesDinamicos("Mujer"));
     }
 
     private void configureLayout() {
@@ -102,11 +86,11 @@ public class StarterForm extends JFrame {
 
         for (Producto p : lista) {
             JButton btn = crearBotonProducto(p);
-            panelFotos.add(btn); // adicionando los botones al panel Fotos
+            panelFotos.add(btn);
         }
 
-        panelFotos.revalidate(); // ubicando los botones en el panel Fotos
-        panelFotos.repaint(); // mostrando los botones en el panel Fotos
+        panelFotos.revalidate();
+        panelFotos.repaint();
     }
 
     private JButton crearBotonProducto(Producto p) {
@@ -122,10 +106,35 @@ public class StarterForm extends JFrame {
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         btn.addActionListener(e -> {
-            boolean isAdmin = usuarioSesion.getRol().equalsIgnoreCase("ADMIN");
-            new DetalleProductoForm(this, p, isAdmin, modeloCarrito).setVisible(true);
+            new DetalleProductoForm(this, p, usuarioSesion, modeloCarrito).setVisible(true);
         });
-
         return btn;
     }
+
+    // En caso somos administradores tenemos que lidiar con la barra y ver sus accion.
+    private void configureMenuBar() {
+        JMenuBar menuBar = new JMenuBar();
+        JMenu menuAccion = new JMenu("Acciones");
+        JMenuItem itemAdd = new JMenuItem("Nuevo Producto");
+
+        itemAdd.addActionListener(e -> abrirFormularioNuevoProducto());
+
+        menuAccion.add(itemAdd);
+        menuBar.add(menuAccion);
+
+        setJMenuBar(menuBar);
+    }
+
+    private void abrirFormularioNuevoProducto(){
+        new AddProducto(this).setVisible(true);
+
+        String generoActual = rbman.isSelected() ? "Hombre" : "Mujer";
+        generarBotonesDinamicos(generoActual);
+    }
+
+
+    // Funciones para gestionar
+    public PuntodeVentaForm getPuntodeVenta() { return navigationService.getPuntodeVenta(modeloCarrito,usuarioSesion);}
+
+    public void resetearPuntoDeVenta() { navigationService.resetear();}
 }

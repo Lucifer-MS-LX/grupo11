@@ -7,13 +7,15 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 public class Producto {
+    private int id;
     private String marca;
     private String genero;
     private double precio;
     private String foto;
     private List<StockPorTalla> inventario;
 
-    public Producto(String marca, String genero, double precio, String foto) {
+    public Producto(int id, String marca, String genero, double precio, String foto) {
+        this.id = id;
         this.marca = marca;
         this.genero = genero;
         this.precio = precio;
@@ -35,15 +37,26 @@ public class Producto {
     }
 
     public Set<Integer> getTallasDisponibles() {
-        // Recorremos el inventario y extraemos solo el número de la talla
         return inventario.stream()
                 .map(StockPorTalla::getTalla)
                 .collect(Collectors.toCollection(TreeSet::new));
     }
 
+    public void setStockParaTalla(int talla, int nuevaCantidad) {
+        for (StockPorTalla st : inventario) {
+            if (st.getTalla() == talla) {
+                st.setCantidad(nuevaCantidad);
+                return;
+            }
+        }
+        // Si la talla no existía, la agregamos
+        this.agregarStock(talla, nuevaCantidad);
+    }
+
     public String getMarca() { return marca; }
-    public String getGenero() { return genero; }
     public double getPrecio() { return precio; }
+    public String getGenero() { return genero; }
     public String getFoto() { return foto; }
-    public List<StockPorTalla> getInventario() { return inventario; }
+    public int getId() { return id; }
+    public void setPrecio(double precio) { this.precio = precio; }
 }

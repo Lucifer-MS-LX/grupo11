@@ -1,27 +1,38 @@
 package com.shoecenter.repository;
 
+import com.shoecenter.config.DatabaseConnection;
 import com.shoecenter.model.Usuario;
-import java.util.ArrayList;
-import java.util.List;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class UsuarioDAO {
-    private List<Usuario> listaUsuarios;
+    public static Usuario validarAcceso(String user, String pass) {
+        Usuario usuarioEncontrado = null;
 
-    public UsuarioDAO() {
-        listaUsuarios = new ArrayList<>();
-        // Simulamos dos usuarios para probar los roless
-        listaUsuarios.add(new Usuario("admin", "1234", "ADMIN"));
-        listaUsuarios.add(new Usuario("vendedora", "abcd", "VENDEDOR"));
-    }
+        String sql = "SELECT username, password, rol FROM usuarios WHERE username = ? AND password = ?";
 
-    // Método para validar el login
-    public Usuario validarAcceso(String user, String pass) {
-        for (Usuario u : listaUsuarios) {
-            // Comparamos usuario y contraseña
-            if (u.getUsername().equals(user) && u.getPassword().equals(pass)) {
-                return u; // Retorna el objeto usuario con su rol si coincide
+        try (Connection con = DatabaseConnection.getConexion();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, user);
+            ps.setString(2, pass);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    usuarioEncontrado = new Usuario(
+                            rs.getString("username"),
+                            rs.getString("password"),
+                            rs.getString("rol")
+                    );
+                }
             }
+        } catch (SQLException e) {
+            System.err.println("Error al conectar con la base de datos: " + e.getMessage());
         }
-        return null; // Si no coinciden, retorna nulo
+
+        return usuarioEncontrado;
     }
 }

@@ -1,77 +1,130 @@
 package com.shoecenter.ui;
 
+import com.shoecenter.model.Producto;
+import com.shoecenter.repository.ProductoDAO;
+
 import javax.swing.*;
 import java.awt.*;
 
-public class AddProducto extends JFrame {
+public class AddProducto extends JDialog {
 
-    // Definición de componentes
-    private JTextField txtNombre, txtPath, txtMarca, txtTalla;
-    private JComboBox<String> comboColor;
+    private JLabel lblNombre, lblFoto, lblPrecio, lblGenero;
+    private JTextField txtNombre, txtfoto, txtprecio;
     private JRadioButton rbHombre, rbMujer;
+    private JButton btnGuardar, btnCancelar;
 
-    public AddProducto() {
-        // Configuración de la Ventana (JFrame)
-        setTitle("Registro de Producto");
-        setSize(550, 400);
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setLocationRelativeTo(null);
+    private final ProductoDAO productoDAO = new ProductoDAO();
 
-        // Componente: JPanel con LayoutManager
+    public AddProducto(Frame parent) {
+        super(parent, "Registro de Nuevo Producto", true);
+        initAddProductoUI(parent);
+    }
+
+    private void initAddProductoUI(Frame parent) {
+        configureWindow(parent);
+        initializeComponents();
+        configureLayout();
+        setupEvents();
+    }
+
+    private void configureWindow(Frame parent) {
+        setSize(350, 240);
+        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        setLocationRelativeTo(parent);
+    }
+
+    private void initializeComponents() {
+
+        lblNombre = new JLabel("Nombre del Producto :");
+        lblFoto = new JLabel("Nombre de la Imagen :");
+        lblPrecio = new JLabel("Precio :");
+        lblGenero = new JLabel("Genero");
+
+        txtNombre = new JTextField(10);
+        txtfoto = new JTextField(10);
+        txtprecio = new JTextField(10);
+
+        rbHombre = new JRadioButton("Hombre", true);
+        rbMujer = new JRadioButton("Mujer");
+        ButtonGroup grupoGenero = new ButtonGroup();
+        grupoGenero.add(rbHombre);
+        grupoGenero.add(rbMujer);
+
+        btnGuardar = new JButton("Guardar Producto");
+        btnCancelar = new JButton("Cancelar");
+    }
+
+    private void configureLayout() {
         JPanel panelPrincipal = new JPanel(new GridBagLayout());
         panelPrincipal.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Fila 1: Nombre del Producto (JTextField)
-        gbc.gridx = 0; gbc.gridy = 0;
-        panelPrincipal.add(new JLabel("Nombre del Producto:"), gbc);
-        txtNombre = new JTextField("Zapatillas Urbanas Hombre Breaknet", 20);
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        panelPrincipal.add(lblNombre, gbc);
         gbc.gridx = 1;
         panelPrincipal.add(txtNombre, gbc);
 
-        // Fila 2: Imagen Path (JTextField)
-        gbc.gridx = 0; gbc.gridy = 1;
-        panelPrincipal.add(new JLabel("Imagen path:"), gbc);
-        txtPath = new JTextField("/home/shoecenter/adidas_breaknet");
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        panelPrincipal.add(lblFoto, gbc);
         gbc.gridx = 1;
-        panelPrincipal.add(txtPath, gbc);
+        panelPrincipal.add(txtfoto, gbc);
 
-        // Fila 3: Marca (JTextField - Modelo de Datos)
-        gbc.gridx = 0; gbc.gridy = 2;
-        panelPrincipal.add(new JLabel("Marca:"), gbc);
-        txtMarca = new JTextField("Adidas");
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        panelPrincipal.add(lblPrecio, gbc);
         gbc.gridx = 1;
-        panelPrincipal.add(txtMarca, gbc);
+        panelPrincipal.add(txtprecio, gbc);
 
-        // Fila 4: Color (JComboBox) y Talla (Validación Input)
-        JPanel filaExtras = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        filaExtras.add(new JLabel("Color: "));
-        comboColor = new JComboBox<>(new String[]{"Blanco", "Negro", "Azul"});
-        filaExtras.add(comboColor);
-
-        filaExtras.add(new JLabel("   Talla: "));
-        txtTalla = new JTextField(5);
-        filaExtras.add(txtTalla);
-
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
-        panelPrincipal.add(filaExtras, gbc);
-
-        // Fila 5: Género (JRadioButton - Grupo de Botones)
-        JPanel panelGenero = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        rbHombre = new JRadioButton("Hombre", true);
-        rbMujer = new JRadioButton("Mujer");
-        ButtonGroup grupoGenero = new ButtonGroup();
-        grupoGenero.add(rbHombre);
-        grupoGenero.add(rbMujer);
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        panelPrincipal.add(lblGenero,gbc);
+        JPanel panelGenero = new JPanel(new GridLayout(1,2));
         panelGenero.add(rbHombre);
         panelGenero.add(rbMujer);
-
-        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
+        gbc.gridx = 1;
         panelPrincipal.add(panelGenero, gbc);
 
-        // Añadir panel a la ventana
+        gbc.gridx = 0; gbc.gridy = 4;
+        panelPrincipal.add(btnGuardar, gbc);
+        gbc.gridx = 1;
+        panelPrincipal.add(btnCancelar,gbc);
         add(panelPrincipal);
+    }
+
+    private void setupEvents() {
+        btnCancelar.addActionListener(e -> dispose());
+        btnGuardar.addActionListener(e -> {
+            validarYGuardar();
+        });
+    }
+
+    private void validarYGuardar() {
+        try {
+            String nombre = txtNombre.getText().trim();
+            String foto = txtfoto.getText().trim();
+            double precio = Double.parseDouble(txtprecio.getText().trim());
+            String genero = rbHombre.isSelected() ? "Hombre" : "Mujer";
+
+            if (nombre.isEmpty() || foto.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos.");
+                return;
+            }
+
+            Producto nuevo = new Producto(0,nombre, genero, precio, foto);
+
+            if (productoDAO.insertar(nuevo)) {
+                JOptionPane.showMessageDialog(this, "Producto registrado correctamente.");
+                dispose(); // Cierra el JDialog
+            } else {
+                JOptionPane.showMessageDialog(this, "Error al guardar en la base de datos.");
+            }
+
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "El precio debe ser un número válido.");
+        }
     }
 }
