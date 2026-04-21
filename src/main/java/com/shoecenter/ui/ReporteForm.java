@@ -1,4 +1,7 @@
 package com.shoecenter.ui;
 
-public class ReporteForm {
+import javax.swing.*;
+
+public class ReporteForm extends JFrame {
+
 }
